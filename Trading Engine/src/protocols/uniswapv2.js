@@ -3,6 +3,7 @@ import { getProvider } from "../core/blockchain.js";
 import { PoolData } from "../core/models.js";
 import UNISWAP_V2_PAIR_ABI from "../abis/uniswapV2Pair.json" with { type: "json" };
 import { Contract } from "ethers";
+import logger from "../utils/logger.js";
 
 export default class UniswapV2Adapter extends BaseProtocol {
   constructor(chain = "ethereum", factoryAddress, pairs) {
@@ -50,7 +51,7 @@ export default class UniswapV2Adapter extends BaseProtocol {
           })
         );
       } catch (err) {
-        console.error(`Error loading pair ${pair.address}:`, err.message);
+        logger.error(`Error loading pair ${pair.address}: ${err.message}`);
       }
     }
 

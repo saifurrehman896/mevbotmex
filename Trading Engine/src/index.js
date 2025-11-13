@@ -6,6 +6,7 @@ import PancakeswapV2Adapter from "./protocols/pancakeswapv2.js";
 import UniswapV3Adapter from "./protocols/uniswapv3.js";
 import Trader from "./core/trader.js";
 import { getProvider } from "./core/blockchain.js";
+import { logger, tradeLogger } from "./utils/logger.js";
 
 async function main() {
   const registry = new ProtocolRegistry();
@@ -15,13 +16,19 @@ async function main() {
   let wallet = null;
   if (settings.privateKey) {
     const provider = getProvider("bsc");
-    trader = new Trader(settings.privateKey, provider, settings.multicallAddress);
+    trader = new Trader(settings.privateKey, provider, settings.multicallAddress, {
+      txTimeout: settings.txTimeout,
+      minProfitPct: settings.minProfitPct
+    });
     wallet = trader.wallet;
-    console.log("🔑 Trader initialized with wallet:", wallet.address);
-    console.log("🔗 Multicall address:", settings.multicallAddress);
+    logger.info(`🔑 Trader initialized with wallet: ${wallet.address}`);
+    logger.info(`🔗 Multicall address: ${settings.multicallAddress}`);
+    logger.info(`⏱️  Transaction timeout: ${settings.txTimeout} ms`);
+    if (settings.minProfitPct) {
+      logger.info(`💵 Minimum profit threshold: ${settings.minProfitPct}%`);
+    }
   }
 
-  // Register protocols with wallet for trading
   const uniswap = new UniswapV3Adapter("bsc", settings.uniswap.factory, settings.uniswap_pair, wallet);
   const pancakeswap = new PancakeswapV2Adapter("bsc", settings.pancake.factory, settings.pancakeswap_pair, wallet);
   registry.register(uniswap);
@@ -29,44 +36,8 @@ async function main() {
 
   const detector = new ArbitrageDetector(registry.getAll(), settings.minSpread, settings.amount);
 
-  console.log("🚀 Starting arbitrage monitor...");
-  console.log("Press Ctrl+C to stop.\n");
-
-  // Test mode: Create fake opportunity
-  if (settings.testMode) {
-    console.log("⚠️ TEST MODE ENABLED - Creating fake opportunity\n");
-    
-    const fakeOpportunity = {
-      buyFrom: "UniswapV3",
-      sellTo: "Pancakeswap",
-      tokenPair: "XRP/USDT",
-      profitPct: 5.0,
-      timestamp: Date.now(),
-      amountIn: BigInt(settings.amount) * 10n ** BigInt(settings.decimals),
-      amountAfterBuy: BigInt(settings.amount) * 10n ** BigInt(settings.decimals) * 105n / 100n, // 5% more
-      amountBack: BigInt(settings.amount) * 10n ** BigInt(settings.decimals) * 110n / 100n, // 10% profit
-      tokenA: settings.tokens.XRP,
-      tokenB: settings.tokens.USDT,
-      buyAmountIn:  2487958361960316679n, // 2.4 USDT
-      sellAmountOut: 2487958361960316679n,
-      buyDex: uniswap,
-      sellDex: pancakeswap,
-    };
-
-    console.log(`🎯 Test opportunity: Buy on ${fakeOpportunity.buyFrom}, Sell on ${fakeOpportunity.sellTo}`);
-    console.log(`   Profit: ${fakeOpportunity.profitPct}%`);
-    console.log(`   Token A (XRP): ${fakeOpportunity.tokenA}`);
-    console.log(`   Token B (USDT): ${fakeOpportunity.tokenB}`);
-    console.log(`   Amount In: ${fakeOpportunity.amountIn}`);
-    console.log(`   Buy Amount Out: ${fakeOpportunity.buyAmountIn}`);
-    console.log(`   Sell Amount Out: ${fakeOpportunity.sellAmountOut}\n`);
-
-    if (trader) {
-      await trader.execute(fakeOpportunity);
-    }
-    return; // Exit after test
-  }
-
+  logger.info("🚀 Starting arbitrage monitor...");
+  logger.info("Press Ctrl+C to stop.");
   // Continuous loop
   while (true) {
     try {
@@ -74,31 +45,32 @@ async function main() {
 
       if (opportunities.length > 0) {
         console.clear();
-        console.log(`[${new Date().toLocaleTimeString()}] 💰 Detected ${opportunities.length} opportunities:`);
+        logger.info(`💰 Detected ${opportunities.length} opportunities:`);
         for (const opp of opportunities) {
-          console.log(
+          logger.info(
             `   → Buy on ${opp.buyFrom.padEnd(12)} | Sell on ${opp.sellTo.padEnd(12)} | Profit: ${opp.profitPct.toFixed(2)}%`
           );
         }
-
-        // Execute best opportunity if trader is configured and auto-execute is enabled
         if (trader && settings.autoExecute) {
-          const bestOpp = opportunities[0]; // highest profit
-          console.log(`\n🎯 Executing best opportunity: ${bestOpp.profitPct.toFixed(2)}% profit`);
+          const bestOpp = opportunities[0]; 
+          tradeLogger.info(`🎯 Executing best opportunity: ${bestOpp.profitPct.toFixed(2)}% profit`);
+          const result = await trader.execute(bestOpp);
           
-          // Protocol adapters are already attached in detector
-          await trader.execute(bestOpp);
+          // Log the result
+          if (result.skipped) {
+            tradeLogger.warn(`⏭️  Trade skipped: ${result.error}`);
+          } else if (!result.success) {
+            tradeLogger.error(`❌ Trade failed: ${result.error}`);
+          }
         }
       } else {
-        console.log(`[${new Date().toLocaleTimeString()}] No arbitrage found.`);
+        logger.info("No arbitrage found.");
       }
     } catch (err) {
-      console.error(`[${new Date().toLocaleTimeString()}] ⚠️ Error:`, err.message);
+      logger.error(`⚠️ Error: ${err.message}`, { stack: err.stack });
     }
-
-    // Wait before next scan
-    await new Promise((r) => setTimeout(r, settings.pollInterval || 5000));
+    await new Promise((r) => setTimeout(r, settings.pollInterval || 3000));
   }
 }
 
-main().catch((e) => console.error("Fatal:", e));
+main().catch((e) => logger.error(`Fatal: ${e.message}`, { stack: e.stack }));

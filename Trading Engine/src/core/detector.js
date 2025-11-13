@@ -1,4 +1,5 @@
 import { Opportunity } from "./models.js";
+import logger from "../utils/logger.js";
 
 export default class ArbitrageDetector {
   constructor(protocols, minSpread = 0.3, amount = 10) {
@@ -13,8 +14,6 @@ export default class ArbitrageDetector {
 
     for (const p of this.protocols) {
       const pools = await p.getPools(this.amount);
-
-      console.log(`Prices from ${p.name} on ${p.chain}:`);
       for (const pool of pools) {
         poolData.push({
           protocol: p.name,
@@ -48,7 +47,7 @@ export default class ArbitrageDetector {
 
 
         const token1Received = buyPool.amountOut; // from first swap
-        const reverseRate = sellPool.amountIn - buyPool.amountOut;  // token0/token1 price from sellPool
+        const reverseRate = sellPool.amountOut > buyPool.amountIn ? (sellPool.amountOut -buyPool.amountIn ) : 0n;  // token0/token1 price from sellPool
               // convert to Ether (still as BigInt ratio, not float)
         const reverseEther = Number(reverseRate) / 1e18;
         const amountEther = Number(this.amount) / 1e18;
@@ -57,7 +56,7 @@ export default class ArbitrageDetector {
         const profitPct = ((reverseEther / amountEther) * 100);
 
         if (profitPct >= this.minSpread) {
-          console.log(
+          logger.info(
             `→ Buy on ${buyPool.protocol.padEnd(12)} | Sell on ${sellPool.protocol.padEnd(
               12
             )} | Profit: ${profitPct.toFixed(2)}%`

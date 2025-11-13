@@ -5,6 +5,7 @@ import QUOTER_V3_ABI from "../abis/quoter_v3.json" with { type: "json" };
 import { Contract } from "ethers";
 import { ethers } from "ethers";
 import settings from "../config/settings.js";
+import logger from "../utils/logger.js";
 
 export default class UniswapV3Adapter extends BaseProtocol {
 
@@ -34,18 +35,18 @@ export default class UniswapV3Adapter extends BaseProtocol {
 
             try {
 
-                const amount = BigInt(settings.amount) * 10n ** BigInt(settings.deciamls); // 1 token (18 decimals)
+            const amount = BigInt(Math.floor(settings.amount * 1e18)); // Convert decimal to wei (18 decimals)
                 const fee = pair.fee || 3000;
                 const paramsIn = {
-                    tokenIn: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE",
-                    tokenOut: "0x55d398326f99059fF775485246999027B3197955",
+                    tokenIn: settings.tokens[pair.token0] || pair.token0,
+                    tokenOut: settings.tokens[pair.token1] || pair.token1,
                     amountIn: amount,
                     fee: fee,
                     sqrtPriceLimitX96: 0,
                 };
                 const paramsOut = {
-                    tokenIn: "0x55d398326f99059fF775485246999027B3197955",
-                    tokenOut: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE",
+                    tokenIn: settings.tokens[pair.token1] || pair.token1,
+                    tokenOut: settings.tokens[pair.token0] || pair.token0,
                     amount: amount,
                     fee: fee,
                     sqrtPriceLimitX96: 0,
@@ -59,10 +60,11 @@ export default class UniswapV3Adapter extends BaseProtocol {
                     amountOut = result[0];
                     const result2 = await this.quoter.quoteExactOutputSingle.staticCall(paramsOut);
                     amountIn = result2[0];
+                    logger.info(`Quoted amounts for pool ${poolAddress}: amountOut=${amountOut}, amountIn=${amountIn}`);
 
                 } catch (qerr) {
                     // Quoter can revert for some pools; log and continue
-                    console.error(`Quoter failed for pool ${poolAddress}:`, qerr.message || qerr);
+                    logger.error(`Quoter failed for pool ${poolAddress}: ${qerr.message || qerr}`);
                 }
                 pools.push(
                     new PoolData({
@@ -81,7 +83,7 @@ export default class UniswapV3Adapter extends BaseProtocol {
                     })
                 );
             } catch (err) {
-                console.error(`Error processing V3 pool ${pair.address}:`, err.message || err);
+                logger.error(`Error processing V3 pool ${pair.address}: ${err.message || err}`);
             }
         }
 

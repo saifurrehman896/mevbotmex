@@ -4,9 +4,10 @@ export default {
     bsc: "https://bsc-mainnet.infura.io/v3/e5b8e6eb8d9c42c89f88f954d1321ae4",
   },
   minSpread: 0.3, // %
-  amount: 1, // USD
+  amount: 0.001, // USD
   decimals: 18,
-  testMode: true, // Set to true to test with a fake opportunity
+
+  minProfitPct: 10, // Minimum profit percentage to execute trade
   
   // Token addresses on BSC
   tokens: {
@@ -19,7 +20,8 @@ export default {
   // Trader configuration
   privateKey: process.env.PRIVATE_KEY, // Set your private key in .env file
   autoExecute: true, // Set to true to automatically execute trades (USE WITH CAUTION!)
-  multicallAddress: "0x57bc80063ea8bbd030e389c5b5fe5d5318c76741", // Multicall3 (same address on most chains)
+  multicallAddress: "0x57bc80063ea8bbd030e389c5b5fe5d5318c76741",
+  txTimeout: 60000, // Transaction timeout in milliseconds
   
   uniswap: {
     factory: "0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7",
@@ -32,7 +34,7 @@ export default {
   },
   uniswap_pair: [
     {
-      address: "0x0aDaF134Ae0c4583b3A38fc3168A83e33162651E", // example WETH/USDC
+      address: "0x0aDaF134Ae0c4583b3A38fc3168A83e33162651E",
       token0: "XRP",
       token1: "USDT",
       dex_version: "V3",
@@ -41,7 +43,7 @@ export default {
   ],
   pancakeswap_pair: [{
 
-    address: "0x3D15D4Fbe8a6ECd3AAdcfb2Db9DD8656c60Fb25c", // example WETH/USDC
+    address: "0x3D15D4Fbe8a6ECd3AAdcfb2Db9DD8656c60Fb25c",
     token0: "XRP",
     token1: "USDT",
     dex_version: "V2",

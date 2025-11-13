@@ -4,6 +4,7 @@ import { PoolData } from "../core/models.js";
 import PANCAKE_V2_PAIR_ABI from "../abis/pancakeswapV2Pair.json" with { type: "json" };
 import { Contract, ethers } from "ethers";
 import settings from "../config/settings.js";
+import logger from "../utils/logger.js";
 
 export default class PancakeswapV2Adapter extends BaseProtocol {
   constructor(chain = "bsc", factoryAddress, pairs, wallet = null) {
@@ -13,8 +14,6 @@ export default class PancakeswapV2Adapter extends BaseProtocol {
     this.provider = getProvider(chain);
     this.routerAddress = pairs[0]?.router_address || "0x10ED43C718714eb63d5aA57B78B54704E256024E";
     this.wallet = wallet;
-
-    // Initialize router contract for trading
     const routerContract = new ethers.Contract(
       this.routerAddress,
       [
@@ -23,8 +22,6 @@ export default class PancakeswapV2Adapter extends BaseProtocol {
       ],
       this.provider
     );
-
-    // Connect to wallet if provided
     this.router = wallet ? routerContract.connect(wallet) : routerContract;
   }
 
@@ -37,7 +34,7 @@ export default class PancakeswapV2Adapter extends BaseProtocol {
       const contract = new Contract(pair.address, PANCAKE_V2_PAIR_ABI, this.provider);
 
       try {
-        console.log(`Fetching reserves for pair: ${pair.address}`);
+        logger.info(`Fetching reserves for pair: ${pair.address}`);
         const [reserve0, reserve1] = await contract.getReserves();
 
         // Convert reserves to BigInt
@@ -48,10 +45,10 @@ export default class PancakeswapV2Adapter extends BaseProtocol {
         const price = Number(r1) / Number(r0);
 
 
-        const amount = BigInt(settings.amount) * 10n ** BigInt(settings.deciamls); // 1 token (18 decimals)
+        const amount = BigInt(Math.floor(settings.amount * 1e18)); // Convert decimal to wei (18 decimals)
         const amountOut = getAmountOut(amount, r0, r1);
         const amountIn = getAmountIn(amount, r1, r0);
-
+        logger.info(`Fetched amounts for pair ${pair.address}: amountOut=${amountOut}, amountIn=${amountIn}`);
         pools.push(
           new PoolData({
             protocol: this.name,
@@ -69,7 +66,7 @@ export default class PancakeswapV2Adapter extends BaseProtocol {
           })
         );
       } catch (err) {
-        console.error(`Error fetching data for ${pair.address}:`, err.message);
+        logger.error(`Error fetching data for ${pair.address}: ${err.message}`);
       }
     }
 
@@ -111,10 +108,7 @@ export default class PancakeswapV2Adapter extends BaseProtocol {
   }
 }
 
-/**
- * Pancakeswap V2 (Uniswap V2 fork) formulas
- * BigInt-safe arithmetic
- */
+
 function getAmountOut(amountIn, reserveIn, reserveOut) {
   const amountInWithFee = amountIn * 9975n; // PancakeSwap uses 0.25% fee (2.5 / 1000)
   const numerator = amountInWithFee * reserveOut;
