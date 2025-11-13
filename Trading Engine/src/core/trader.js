@@ -90,7 +90,7 @@ export default class Trader {
        const buyTxData = await buyDex.tradeBuy(
          tokenA,
          tokenB,
-         amounttest,
+         amount,
          maxInbuy,
          this.multicallAddress
        );
@@ -160,7 +160,7 @@ export default class Trader {
            allowFailure: false,
            callData: erc20Iface.encodeFunctionData("transfer", [
              this.wallet.address,
-             amounttest // Initial amount + expected profit
+             amount // Initial amount + expected profit
            ])
          }
       ];
