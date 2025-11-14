@@ -20,7 +20,7 @@ export default {
   // Trader configuration
   privateKey: process.env.PRIVATE_KEY, // Set your private key in .env file
   autoExecute: true, // Set to true to automatically execute trades (USE WITH CAUTION!)
-  multicallAddress: "0x57bc80063ea8bbd030e389c5b5fe5d5318c76741",
+  multicallAddress: "0xF20FC6628058876843Dbdb91a28824a0ac719a55",
   txTimeout: 60000, // Transaction timeout in milliseconds
   
   uniswap: {
